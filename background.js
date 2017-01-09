@@ -8,6 +8,8 @@ var sessions = [];
 var item = localStorage.getItem("sessions");
 var saved = item != null ? JSON.parse(item) : null;
 
+var isBrowserActive = true;
+
 if(saved && saved.push){
     sessions = saved;
 }
@@ -16,26 +18,49 @@ chrome.browserAction.onClicked.addListener(function(tab) {
 });
 
 chrome.webNavigation.onCompleted.addListener(function(details) {
-
 });
 
 chrome.tabs.onCreated.addListener(function(tab) {         
 });
 
+chrome.tabs.onRemoved.addListener(function(tabId){
+    if(tabId == activeTabId){
+        endSession(session);
+    }
+});
+
 chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-    onNewSessionStart(tabId);
+    console.log(activeTabId + " " + tabId);
+    if(tabId == activeTabId && isBrowserActive){
+        onNewSessionStart(tabId);
+    }
 });
 
 chrome.tabs.onActivated.addListener(function(info){
+    activeTabId = info.tabId;
     onNewSessionStart(info.tabId);
 });
 
 chrome.windows.onFocusChanged.addListener(function(window) {
     if (window == chrome.windows.WINDOW_ID_NONE) {
+        isBrowserActive = false;
         onSessionEnd();
     }
     else if (activeTab){
+        isBrowserActive = true;
         onSessionStart(activeTab.url);
+    }
+});
+
+chrome.idle.setDetectionInterval(15);
+
+chrome.idle.onStateChanged.addListener(function(state){
+
+    if(state == "active" && !session){
+        onNewSessionStart(activeTabId);
+    }
+    else if(state == "idle" || state == "locked" && session){
+        onSessionEnd();
     }
 });
 
@@ -55,7 +80,6 @@ function onNewSessionStart(tabId){
 
     chrome.tabs.get(tabId, function(tab){
         activeTab = tab;
-        activeTabId = tabId;
 
         if(!isHttp(tab.url)){
             return false;
@@ -83,6 +107,7 @@ function onSessionEnd(){
         endSession(session);
         sessions.push(session);
         localStorage.setItem("sessions", JSON.stringify(sessions));
+        console.log("Session lasted for " + Math.abs(session.end - session.start) / 1000 + "s");
         session = null;
     }
 };
