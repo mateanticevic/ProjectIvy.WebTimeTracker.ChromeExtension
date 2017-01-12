@@ -1,6 +1,8 @@
 var activeTab;
 var activeTabId;
 
+var currentUrl;
+
 var session;
 
 var sessions = [];
@@ -9,6 +11,7 @@ var item = localStorage.getItem("sessions");
 var saved = item != null ? JSON.parse(item) : null;
 
 var isBrowserActive = true;
+var isUserActive = true;
 
 if(saved && saved.push){
     sessions = saved;
@@ -25,30 +28,58 @@ chrome.tabs.onCreated.addListener(function(tab) {
 
 chrome.tabs.onRemoved.addListener(function(tabId){
     if(tabId == activeTabId){
-        endSession(session);
+        onSessionEnd();
     }
 });
 
 chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-    console.log(activeTabId + " " + tabId);
-    if(tabId == activeTabId && isBrowserActive){
-        onNewSessionStart(tabId);
+    if(tabId == activeTabId){
+
+        currentUrl = tab.url;
+
+        if(session && session.domain != urlToDomain(tab.url)){
+            onSessionEnd();
+            onSessionStart(tab.url);
+        }
+        else if(!session){
+            onSessionStart(tab.url);
+        }
     }
 });
 
 chrome.tabs.onActivated.addListener(function(info){
-    activeTabId = info.tabId;
-    onNewSessionStart(info.tabId);
+
+    chrome.tabs.get(info.tabId, function(tab){
+        activeTab = tab;
+        activeTabId = info.tabId;
+        currentUrl = tab.url;
+
+        if(session && session.domain != urlToDomain(tab.url)){
+            onSessionEnd(); 
+        }
+
+        if(isHttp(tab.url) && !session){
+            onSessionStart(tab.url);
+        }
+    });
 });
 
-chrome.windows.onFocusChanged.addListener(function(window) {
-    if (window == chrome.windows.WINDOW_ID_NONE) {
+chrome.windows.onFocusChanged.addListener(function(windowId) {
+
+    if (windowId < 0) {
         isBrowserActive = false;
         onSessionEnd();
     }
-    else if (activeTab){
+    else if(windowId > 0){
         isBrowserActive = true;
-        onSessionStart(activeTab.url);
+        
+        chrome.tabs.query({active: true, windowId: windowId}, function(tabs){
+            var tab = tabs[0];
+            activeTab = tab;
+            activeTabId = tab.id;
+            currentUrl = tab.url;
+            onSessionStart(tab.url);       
+        });
     }
 });
 
@@ -56,13 +87,32 @@ chrome.idle.setDetectionInterval(15);
 
 chrome.idle.onStateChanged.addListener(function(state){
 
-    if(state == "active" && !session){
-        onNewSessionStart(activeTabId);
-    }
-    else if(state == "idle" || state == "locked" && session){
-        onSessionEnd();
-    }
+    chrome.windows.getLastFocused(null, function(window){
+
+        if(state == "active" && !session && window.focused){
+            isUserActive = true;
+            onSessionStart(currentUrl);
+        }
+        else if(state == "idle" || state == "locked" && session){
+            isUserActive = false;
+            onSessionEnd();
+        }
+    });
 });
+
+setInterval(function(){
+    chrome.windows.getLastFocused(null, function(window){
+        if(window.focused && !session && isUserActive){
+            chrome.tabs.query({active: true, windowId: window.id}, function(tabs){
+                var tab = tabs[0];
+                onSessionStart(tab.url);
+            });
+        }
+        else if(!window.focused && session){
+            onSessionEnd();
+        }
+    });
+}, 1000);
 
 function newSession(url){
     return {
@@ -72,39 +122,21 @@ function newSession(url){
     };
 };
 
-function endSession(session){
-    session.end = new Date();
-};
-
-function onNewSessionStart(tabId){
-
-    chrome.tabs.get(tabId, function(tab){
-        activeTab = tab;
-
-        if(!isHttp(tab.url)){
-            return false;
-        }
-
-        if(session != undefined && session.domain != urlToDomain(tab.url)){
-            onSessionEnd();
-        }
-
-        if(session == undefined || session.domain != urlToDomain(tab.url)){
-            onSessionStart(tab.url);
-        }
-    });
-};
-
 function onSessionStart(url){
+
+    if(session){
+        onSessionEnd();
+    }
+
     if(isHttp(url)){
-        session = newSession(url);
+        session = new Session(url);
         console.log(urlToDomain(url));
     }
 };
 
 function onSessionEnd(){
     if(session){
-        endSession(session);
+        session.end();
         sessions.push(session);
         localStorage.setItem("sessions", JSON.stringify(sessions));
         console.log("Session lasted for " + Math.abs(session.end - session.start) / 1000 + "s");
@@ -136,6 +168,11 @@ function isSecured(url){
 };
 
 function isHttp(url){
+
+    if(!url){
+        return false;
+    }
+
     if (url.indexOf("https://") == 0) {
         return true;
     }
@@ -145,4 +182,14 @@ function isHttp(url){
     else{
         return false;
     }
+};
+
+function Session(url){
+    this.start = new Date();
+    this.domain = urlToDomain(url);
+    this.isSecured = isSecured(url);
+};
+
+Session.prototype.end = function() {
+    this.end = new Date();
 };
