@@ -136,10 +136,20 @@ function onSessionStart(url){
 
 function onSessionEnd(){
     if(session){
+
         session.end();
-        sessions.push(session);
-        localStorage.setItem("sessions", JSON.stringify(sessions));
-        console.log("Session lasted for " + Math.abs(session.end - session.start) / 1000 + "s");
+        
+        var duration = Math.abs(session.end - session.start) / 1000;
+
+        if(duration > 1){
+            sessions.push(session);
+            localStorage.setItem("sessions", JSON.stringify(sessions));
+            console.log("Session lasted for " + duration  + "s");
+        }
+        else{
+            console.log("Sesssion too short.")
+        }
+
         session = null;
     }
 };
@@ -184,12 +194,38 @@ function isHttp(url){
     }
 };
 
+function sync(){
+
+        var session = sessions[0];
+
+        var data = {
+            domain: session.domain,
+            end: session.end,
+            start: session.start,
+            isSecured: session.isSecured
+        };
+
+        $.ajax({
+            contentType: 'application/json',
+            url: 'http://localhost:4680/device/acer-aspire-v5/browserLog',
+            data: JSON.stringify(data),
+            type: 'PUT',
+            success: function(response) {
+                console.log('uploaded');
+                sessions.shift();
+                if(sessions.length > 0){
+                    sync();
+                }
+            }
+        });
+}
+
 function Session(url){
     this.start = new Date();
     this.domain = urlToDomain(url);
     this.isSecured = isSecured(url);
-};
+}
 
 Session.prototype.end = function() {
     this.end = new Date();
-};
+}
