@@ -3,7 +3,7 @@
 
   "name": "Tracking monitor",
   "description": "Bla bla bla",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "background": {
     "scripts": ["jquery.js", "background.js"]
   },

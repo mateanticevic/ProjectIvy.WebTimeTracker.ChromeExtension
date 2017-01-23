@@ -210,11 +210,13 @@ function sync(){
             url: 'http://api2.anticevic.net/device/acer-aspire-v5/browserLog',
             data: JSON.stringify(data),
             type: 'PUT',
-            success: function(response) {
-                console.log('uploaded');
-                sessions.shift();
-                if(sessions.length > 0){
-                    sync();
+            complete: function(xhr) {
+                if(xhr.status == "201" || xhr.status == "409"){
+                    console.log('uploaded');
+                    sessions.shift();
+                    if(sessions.length > 0){
+                        sync();
+                    }
                 }
             }
         });
