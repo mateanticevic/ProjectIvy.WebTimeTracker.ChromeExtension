@@ -13,6 +13,8 @@ var saved = item != null ? JSON.parse(item) : null;
 var isBrowserActive = true;
 var isUserActive = true;
 
+var authorizationToken = localStorage.getItem("token");
+
 if(saved && saved.push){
     sessions = saved;
 }
@@ -210,6 +212,9 @@ function sync(){
             url: 'http://api2.anticevic.net/device/acer-aspire-v5/browserLog',
             data: JSON.stringify(data),
             type: 'PUT',
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader ("Authorization", authorizationToken);
+            },
             complete: function(xhr) {
                 if(xhr.status == "201" || xhr.status == "409"){
                     console.log('uploaded');
