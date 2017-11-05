@@ -5,7 +5,7 @@
   "description": "Bla bla bla",
   "version": "0.1.1",
   "background": {
-    "scripts": ["jquery.js", "background.js"]
+    "scripts": ["jquery.js", "background.js", "jquery-3.2.1.min.js"]
   },
   "browser_action": {
    "default_icon": "icon.png",

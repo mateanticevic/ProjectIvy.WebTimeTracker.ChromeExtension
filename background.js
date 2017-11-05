@@ -209,7 +209,7 @@ function sync(){
 
         $.ajax({
             contentType: 'application/json',
-            url: 'http://api2.anticevic.net/device/acer-aspire-v5/browserLog',
+            url: 'http://api2.anticevic.net/device/lenovo-l530/browserLog',
             data: JSON.stringify(data),
             type: 'PUT',
             beforeSend: function (xhr) {
